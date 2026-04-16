@@ -1,52 +1,137 @@
-# NOVA – Noise Oriented Visual Aesthetics
+# nova
 
-**NOVA** is a browser-based, audio-reactive generative art experience. It transforms your microphone’s audio input into a living, cosmic visualization in real time. 
-
-Sound doesn’t just control a flat graphic—it shapes space itself. Watch as low bass frequencies expand a central planetary body (inspired by Saturn and Jupiter), while soundwaves visibly ripple outwards through a drifting field of stars. 
-
-The goal of NOVA is not to be a complex technical dashboard, but to offer a calm, immersive, and atmospheric space that reacts organically to the environment around you.
-
-## ✨ Features
-- **Real-Time Audio Reactivity:** Uses your microphone to immediately translate surrounding sound into fluid motion.
-- **Cosmic Environment:** A 3D-feeling starfield that gently accelerates and brightens with audio intensity.
-- **Generative Planet:** A living celestial body that breathes with sound, featuring dynamic atmospheric bands and an equatorial energy ring.
-- **Dynamic Wave Systems:** Sound spikes spawn vibrant, multi-tonal ripples that expand outward into deep space.
-
-## 🚀 How to Run Locally 
-
-You don't need any complex build steps or Node.js installations to run NOVA. Since it's built completely with vanilla web technologies, you only need your browser and a simple local web server.
-
-1. **Download or Clone** this repository to your computer.
-2. **Start a local server:** Modern browsers block microphone access for security reasons if you simply open the `index.html` file using your file explorer (the URL will start with `file:///`). You must serve the folder locally.
-   - **Using VS Code / Cursor:** Install the "Live Server" extension, open the project folder, and click "Go Live" in the bottom right corner.
-   - **Using Terminal (Mac/Linux):** Open your terminal, navigate to the NOVA folder, and run:
-     ```bash
-     python3 -m http.server 8000
-     ```
-     Then open your browser and go to `http://localhost:8000`.
-3. Click the **START** button on the screen!
-
-## 🎙️ Microphone Permissions
-
-To create the visuals, NOVA needs to "hear" the room. When you click **START**, your browser will show a prompt asking for permission to use your microphone. 
-- Click **Allow**. 
-- NOVA does not record, save, or transmit any audio data. The sound is only analyzed instantaneously in your own browser to generate the graphics.
-
-## 🛠️ Common Issues & Troubleshooting
-
-- **The screen says "MIC BLOCKED - RETRY"**
-  This happens if your browser blocks the microphone. Make sure you are accessing the site via a local server (like `http://localhost:8000` or `http://127.0.0.1`) and **not** by dragging the file into the browser (which results in a `file:///` restriction).
-- **I am using localhost but it still doesn't work**
-  Check your browser's address bar. On the far left (next to the URL), click the lock or settings icon and ensure "Microphone" is set to "Allow" instead of "Ask" or "Block". Load the page again.
-- **The screen is black/unresponsive after allowing the mic**
-  Ensure you are making noise! The visualization requires audio to come alive. You can also press `F12` to open the Developer Console and check for any bold red errors.
-
-## 💻 Tech Stack
-
-NOVA is built purely with native web standards. No heavy frameworks or libraries are required.
-- **Vanilla JavaScript** for drawing logic, animation loops, and easing.
-- **HTML5 Canvas API** for rendering the graphics, gradients, and particles.
-- **Web Audio API** (`AnalyserNode` and Fast Fourier Transforms) for converting raw audio streams into real-time frequency and bass data.
+*noise oriented visual aesthetics*
 
 ---
-*Created with a focus on immersive aesthetics and fluid generative art.*
+
+nova is a browser-based, audio-reactive visual experience.
+
+it listens to your environment and transforms sound into a living, evolving space —
+not as a tool, but as an atmosphere.
+
+low frequencies expand a central planetary body.
+higher tones ripple outward as waves through a drifting field of stars.
+
+this is not a dashboard.
+it is a quiet, reactive environment.
+
+---
+
+## what it does
+
+nova creates a real-time connection between sound and space:
+
+* your surroundings become motion
+* a cosmic environment slowly reacts and shifts
+* a central “planet” breathes with audio input
+* waves expand outward and shape the visual field
+
+everything happens live, in your browser.
+
+---
+
+## how to run it
+
+to experience nova, you need to run it on a local server.
+this is required so your browser allows microphone access.
+
+### easiest way
+
+open a terminal inside the project folder and run:
+
+```bash id="run-nova"
+npx live-server
+```
+
+this will start a local server and open the project in your browser automatically
+(usually at `http://127.0.0.1:5500`).
+
+---
+
+### if this does not work
+
+`npx` requires node.js to be installed.
+
+you can install it in one of the following ways:
+
+* easiest: download from https://nodejs.org/
+* via terminal (mac, using homebrew):
+
+  ```bash id="install-node"
+  brew install node
+  ```
+
+---
+
+### alternative options
+
+if you prefer other methods:
+
+**vs code**
+install the “Live Server” extension and click “Go Live”
+
+**python**
+run:
+
+```bash id="python-server"
+python3 -m http.server 8000
+```
+
+then open:
+http://localhost:8000
+
+---
+
+## microphone access
+
+nova uses your microphone to generate the visuals.
+
+when you click “start”, your browser will ask for permission.
+
+* allow access to continue
+* no audio is recorded or stored
+* everything happens locally in your browser
+
+---
+
+## common issues
+
+**microphone is blocked**
+
+make sure you are not opening the file directly (`file:///`).
+use `http://localhost` instead.
+
+also check your browser permissions (icon next to the URL).
+
+---
+
+**nothing happens on screen**
+
+nova needs sound to react.
+try speaking, playing music, or creating ambient noise.
+
+you can also open developer tools (F12) to check for errors.
+
+---
+
+## tech
+
+built with native web technologies:
+
+* javascript
+* html canvas
+* web audio api
+
+no frameworks. no dependencies.
+
+---
+
+## note
+
+this project is an experiment in generative visuals, interaction,
+and the idea of translating sound into spatial experience.
+
+---
+
+*created as part of my journey in media engineering —
+somewhere between code, design, and atmosphere.*
