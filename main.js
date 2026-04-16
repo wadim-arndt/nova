@@ -146,23 +146,27 @@ function draw() {
   }
   
   // 3. Planet / Central Body (Jupiter/Saturn Inspired)
-  const planetBase = 80;
+  const planetBase = 60; // Slightly smaller base
   // Planet size driven by general intensity, but slightly influenced by bass
-  const planetRadius = planetBase + (currentIntensity * 90) + (currentBass * 40); 
+  const planetRadius = planetBase + (currentIntensity * 70) + (currentBass * 30); 
   
+  // Subtle floating motion (organic drift)
+  const planetX = centerX + Math.cos(time * 0.4) * 15;
+  const planetY = centerY + Math.sin(time * 0.5) * 10;
+
   // Planet color shifts dynamically over time and intensity
   const hue = 220 + (currentIntensity * 80) + (Math.sin(time * 0.5) * 30);
 
   // Clipping region to draw atmospheric bands neatly on the planet
   ctx.save();
   ctx.beginPath();
-  ctx.arc(centerX, centerY, planetRadius, 0, Math.PI * 2);
+  ctx.arc(planetX, planetY, planetRadius, 0, Math.PI * 2);
   ctx.clip(); // Ensure bands don't paint outside the planet bounds
 
   // Create a spherical 3D gradient for the planet base
   const planetGradient = ctx.createRadialGradient(
-    centerX - planetRadius * 0.3, centerY - planetRadius * 0.3, planetRadius * 0.1,
-    centerX, centerY, planetRadius
+    planetX - planetRadius * 0.3, planetY - planetRadius * 0.3, planetRadius * 0.1,
+    planetX, planetY, planetRadius
   );
   planetGradient.addColorStop(0, `hsl(${hue + 30}, 90%, 85%)`); // Bright core
   planetGradient.addColorStop(0.5, `hsl(${hue}, 70%, 50%)`);    // Mid tone
@@ -176,10 +180,10 @@ function draw() {
   for(let b = 0; b < 5; b++) {
      ctx.beginPath();
      // Draw thick, soft ellipses over the surface
-     const bandY = centerY - planetRadius + (b * (planetRadius * 0.5));
+     const bandY = planetY - planetRadius + (b * (planetRadius * 0.5));
      // The thickness of the bands pulses dynamically with the bass
      const bandHeight = planetRadius * 0.2 + (currentBass * 20);
-     ctx.ellipse(centerX, bandY, planetRadius, bandHeight, 0, 0, Math.PI * 2);
+     ctx.ellipse(planetX, bandY, planetRadius, bandHeight, 0, 0, Math.PI * 2);
      ctx.fillStyle = `hsla(${hue + (b * 15)}, 60%, 50%, 0.15)`;
      ctx.fill();
   }
@@ -187,21 +191,22 @@ function draw() {
 
   // Soft atmospheric planet glow (rendered outside so it isn't clipped)
   ctx.beginPath();
-  ctx.arc(centerX, centerY, planetRadius, 0, Math.PI * 2);
+  ctx.arc(planetX, planetY, planetRadius, 0, Math.PI * 2);
   ctx.shadowBlur = 60 + (currentIntensity * 80);
   ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
   ctx.fillStyle = 'rgba(0,0,0,0)'; // transparent fill just to trigger the outer shadow
   ctx.fill();
   ctx.shadowBlur = 0;
   
-  // 4. Energy Fields / Radial Expanding Waves
+  // 4. Energy Fields / Radial Expanding Waves (Organic distortion)
   // Spawn new expanding waves spontaneously, mapped to bass spikes
   if (Math.random() < currentBass * 0.3 + 0.02) {
       waveRings.push({ 
           radius: planetRadius, 
-          alpha: 0.8, 
-          hueOffset: Math.random() * 60 - 30, // Dynamic color variation per wave
-          speed: 1 + (currentBass * 4) // wave expanding speed tied to current bass
+          alpha: 0.5, // Start more transparent
+          hueOffset: Math.random() * 60 - 30, 
+          speed: 1 + (currentBass * 4),
+          seed: Math.random() * 100 // Seed for organic jitter
       });
   }
 
@@ -209,24 +214,33 @@ function draw() {
   for (let i = waveRings.length - 1; i >= 0; i--) {
       let wave = waveRings[i];
       
-      // Expand outward smoothly
       wave.radius += wave.speed + (currentIntensity * 3);
-      // Fade out slowly
-      wave.alpha -= 0.005 + (currentIntensity * 0.002);
+      wave.alpha -= 0.003 + (currentIntensity * 0.002); // Fade out even slower for atmosphere
       
       if (wave.alpha <= 0) {
-          waveRings.splice(i, 1); // remove dead waves
+          waveRings.splice(i, 1);
       } else {
+          // Organic "Vibration" / Jittery Energy Circle
           ctx.beginPath();
-          ctx.arc(centerX, centerY, wave.radius, 0, Math.PI * 2);
+          const segments = 60;
+          for (let s = 0; s <= segments; s++) {
+              const angle = (s / segments) * Math.PI * 2;
+              // Subtle oscillation/jitter in the radius based on time and segment
+              const jitter = Math.sin(time * 5 + s + wave.seed) * (2 + currentBass * 10);
+              const r = wave.radius + jitter;
+              const wx = planetX + Math.cos(angle) * r;
+              const wy = planetY + Math.sin(angle) * r;
+              
+              if (s === 0) ctx.moveTo(wx, wy);
+              else ctx.lineTo(wx, wy);
+          }
+          ctx.closePath();
           
-          // dynamic multi-tonal shifting as it expands
           const waveHue = hue + wave.hueOffset + (wave.radius * 0.1);
-          
           ctx.strokeStyle = `hsla(${waveHue}, 90%, 65%, ${wave.alpha})`;
-          ctx.lineWidth = 1 + (wave.alpha * 3) + (currentBass * 4);
+          ctx.lineWidth = 0.5 + (wave.alpha * 2) + (currentBass * 2);
           
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = 15;
           ctx.shadowColor = `hsl(${waveHue}, 100%, 70%)`;
           ctx.stroke();
           ctx.shadowBlur = 0;
@@ -234,19 +248,24 @@ function draw() {
   }
   
   // 5. Aesthetic Equatorial Energy Ring (Saturn ring aspect)
+  const ringRotation = time * 0.15; // Slow continuous rotation
+  const ringHue = hue + 20 + Math.sin(time * 0.3) * 40; // Slowly shifting hue
+
   ctx.beginPath();
-  const ringRadiusX = planetRadius * 2.2 + (currentIntensity * 80);
-  const ringRadiusY = planetRadius * 0.4 + (currentIntensity * 20);
-  // Tilt the ring by an angle, representing an orbital field
-  ctx.ellipse(centerX, centerY, ringRadiusX, ringRadiusY, 0.35, 0, Math.PI * 2);
+  const ringRadiusX = planetRadius * 2.2 + (currentIntensity * 60);
+  const ringRadiusY = planetRadius * 0.4 + (currentIntensity * 15);
+  // Dynamic rotation and center tied to planet
+  ctx.ellipse(planetX, planetY, ringRadiusX, ringRadiusY, 0.35 + ringRotation, 0, Math.PI * 2);
   
-  // Linear gradient gives the ring depth and fading edges
-  const ringGrad = ctx.createLinearGradient(centerX - ringRadiusX, centerY - ringRadiusY, centerX + ringRadiusX, centerY + ringRadiusY);
-  ringGrad.addColorStop(0, `hsla(${hue + 40}, 80%, 70%, 0.1)`);
-  ringGrad.addColorStop(0.5, `hsla(${hue - 10}, 90%, 80%, ${0.3 + currentBass * 0.4})`);
-  ringGrad.addColorStop(1, `hsla(${hue + 20}, 70%, 60%, 0.0)`);
+  const ringGrad = ctx.createLinearGradient(
+    planetX - ringRadiusX, planetY - ringRadiusY, 
+    planetX + ringRadiusX, planetY + ringRadiusY
+  );
+  ringGrad.addColorStop(0, `hsla(${ringHue + 40}, 80%, 70%, 0.05)`);
+  ringGrad.addColorStop(0.5, `hsla(${ringHue}, 90%, 80%, ${0.2 + currentBass * 0.4})`);
+  ringGrad.addColorStop(1, `hsla(${ringHue + 20}, 70%, 60%, 0.0)`);
   
   ctx.strokeStyle = ringGrad;
-  ctx.lineWidth = 4 + (currentBass * 10);
+  ctx.lineWidth = 3 + (currentBass * 8);
   ctx.stroke();
 }
