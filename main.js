@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 //  NOVA – Noise Oriented Visual Aesthetics
-//  Step 4: Nebula depth · Ring occlusion · Smooth waveform · Idle breath
+//  Step 5: Star field · Ring particles · Treble shimmer
 //  · Saturn-like planet core with layered atmospheric glow
 //  · Orbital rings split into back/front arcs (planet occludes center)
 //  · Nebula cloud layer: slow, large drifting soft blobs
@@ -117,6 +117,48 @@ class Particle {
 const particles = Array.from({ length: 380 }, () => new Particle());
 
 // ─────────────────────────────────────────────────────────────
+//  STAR FIELD  — generated once, fixed in place
+//  Three magnitude tiers (bright / mid / dim) give depth.
+//  Stars are drawn every frame beneath all other layers.
+// ─────────────────────────────────────────────────────────────
+const STAR_COUNT = 320;
+let stars = [];  // populated on first draw (canvas may not be sized yet)
+
+function buildStarField(W, H) {
+  stars = [];
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const tier  = Math.random();        // 0–1 → determines brightness
+    stars.push({
+      x       : Math.random() * W,
+      y       : Math.random() * H,
+      // Bright stars are rare; most are dim
+      size    : tier > 0.97 ? Math.random() * 1.2 + 0.9   // bright
+              : tier > 0.85 ? Math.random() * 0.7 + 0.4   // mid
+              :               Math.random() * 0.35 + 0.1,  // dim
+      alpha   : tier > 0.97 ? Math.random() * 0.5 + 0.5
+              : tier > 0.85 ? Math.random() * 0.35 + 0.2
+              :               Math.random() * 0.2  + 0.05,
+      // Slow independent twinkle phase
+      phase   : Math.random() * Math.PI * 2,
+      tSpeed  : Math.random() * 0.6 + 0.2,
+    });
+  }
+}
+
+function drawStarField(t, overallNorm) {
+  for (const s of stars) {
+    // Twinkle: alpha oscillates gently around the base value
+    const twinkle = 1 + 0.25 * Math.sin(s.phase + t * s.tSpeed);
+    // Stars get very slightly brighter when sound is loud
+    const a = Math.min(1, s.alpha * twinkle * (1 + overallNorm * 0.3));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220, 230, 255, ${a})`;
+    ctx.fill();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 //  SHOCKWAVES — widened, softer rolling energy ripples
 // ─────────────────────────────────────────────────────────────
 const shockwaves = [];
@@ -142,6 +184,62 @@ function updateAndDrawShockwaves(cx, cy) {
     ctx.stroke();
     ctx.shadowBlur  = 0;
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  RING PARTICLES  — tiny glowing specks orbiting the rings
+//  They ride the same ellipse math as the rings, so they look
+//  physically attached.  Audio speeds them up subtly.
+// ─────────────────────────────────────────────────────────────
+const RING_PARTICLE_COUNT = 55;
+const ringParticles = Array.from({ length: RING_PARTICLE_COUNT }, (_, i) => ({
+  // Assign to a random ring tier (0, 1, or 2)
+  ringIdx  : Math.floor(Math.random() * RING_DEFS.length),
+  // Angle along the ellipse (0 → 2π)
+  angle    : Math.random() * Math.PI * 2,
+  // Individual angular speed — vary so they don't clump
+  angSpeed : (Math.random() * 0.008 + 0.003) * (Math.random() < 0.5 ? 1 : -1),
+  // Brightness
+  alpha    : Math.random() * 0.5 + 0.3,
+  size     : Math.random() * 1.8 + 0.6,
+  // Twinkling
+  phase    : Math.random() * Math.PI * 2,
+}));
+
+function updateAndDrawRingParticles(cx, cy, planetR, hue, bassNorm, t, rotZ) {
+  for (const rp of ringParticles) {
+    const ring    = RING_DEFS[rp.ringIdx];
+    const rx      = planetR * ring.xScale;
+    const ry      = planetR * ring.yScale;
+
+    // Advance angle (bass adds urgency)
+    rp.angle += rp.angSpeed * (1 + bassNorm * 1.6);
+
+    // Ellipse point — apply same tilt + rotZ as the visual rings
+    const cosT = Math.cos(RING_TILT), sinT = Math.sin(RING_TILT);
+    const ex   = rx * Math.cos(rp.angle);
+    const ey   = ry * Math.sin(rp.angle);
+    // Rotate by RING_TILT
+    const rx2  = ex * cosT - ey * sinT;
+    const ry2  = ex * sinT + ey * cosT;
+    // Rotate by screen-plane precession (same as rings)
+    const cosR = Math.cos(rotZ), sinR = Math.sin(rotZ);
+    const px   = cx + rx2 * cosR - ry2 * sinR;
+    const py   = cy + rx2 * sinR + ry2 * cosR;
+
+    // Twinkle
+    const tw = 0.6 + 0.4 * Math.sin(rp.phase + t * 1.4);
+    const a  = rp.alpha * tw;
+
+    const rHue = (hue + ring.hueOff + 200) % 360;
+    ctx.beginPath();
+    ctx.arc(px, py, rp.size, 0, Math.PI * 2);
+    ctx.fillStyle   = `hsla(${rHue}, 80%, 92%, ${a})`;
+    ctx.shadowColor = `hsla(${rHue}, 100%, 95%, ${a * 0.5})`;
+    ctx.shadowBlur  = 6;
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -276,7 +374,7 @@ function drawPlanet(cx, cy, radius, hue, bassNorm, t) {
   ctx.fillStyle = specGrd;
   ctx.fill();
 
-  // ── 5. Audio pulse — soft corona glow driven by bass ───────
+  // ── 5. Bass corona pulse ────────────────────────────────────
   const pulseAlpha = 0.08 + bassNorm * 0.28;
   const pulseGrd   = ctx.createRadialGradient(cx, cy, radius * 0.7, cx, cy, radius * 1.9);
   pulseGrd.addColorStop(0, `hsla(${hue + 200}, 100%, 80%, ${pulseAlpha})`);
@@ -285,6 +383,30 @@ function drawPlanet(cx, cy, radius, hue, bassNorm, t) {
   ctx.arc(cx, cy, radius * 1.9, 0, Math.PI * 2);
   ctx.fillStyle = pulseGrd;
   ctx.fill();
+
+  // ── 6. Treble shimmer — high-freq melody reacts here ───────
+  // A fast, tighter corona that flares on treble hits.
+  // Clipped to the planet disc so it reads as a surface effect.
+  if (bassNorm > 0) {  // parameter reused; actual treble passed as arg below
+    // (treble is forwarded via the bassNorm arg — see draw loop)
+  }
+  // The caller passes (bassNorm + trebleBoost) as the bass arg;
+  // we split the "extra" part out here for a distinct colour.
+  const trebleExtra = Math.max(0, bassNorm - 0.08);
+  if (trebleExtra > 0.01) {
+    const shimHue  = (hue + 280) % 360;   // violet-white shimmer
+    const shimAlpha = trebleExtra * 0.5;
+    const shimGrd  = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 1.1);
+    shimGrd.addColorStop(0,   `hsla(${shimHue}, 100%, 98%, ${shimAlpha * 0.7})`);
+    shimGrd.addColorStop(0.6, `hsla(${shimHue},  90%, 80%, ${shimAlpha * 0.3})`);
+    shimGrd.addColorStop(1,   `hsla(${shimHue},  80%, 60%, 0)`);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = shimGrd;
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -524,6 +646,9 @@ function draw(analyser, freqData, waveData) {
   // ── Smooth waveform via rolling buffer ────────────────────────
   const smoothedWave = smoothWave(waveData);
 
+  // ── Ring precession angle ─ shared by rings + ring particles ──
+  const rotZ = t * 0.012;
+
   // ================================================================
   //  RENDER LAYERS  (back to front)
   // ================================================================
@@ -533,7 +658,11 @@ function draw(analyser, freqData, waveData) {
   ctx.fillStyle  = "rgba(0, 0, 4, 0.14)";
   ctx.fillRect(0, 0, W, H);
 
-  // · Flow-field star-dust particles (deepest layer)
+  // · Static star field (deepest fixed layer)
+  if (stars.length === 0) buildStarField(W, H);
+  drawStarField(t, overallNorm);
+
+  // · Flow-field star-dust particles
   for (const p of particles) { p.update(bassNorm, t); p.draw(hue); }
 
   // · Nebula cloud layer — atmospheric depth, behind vignette
@@ -552,13 +681,17 @@ function draw(analyser, freqData, waveData) {
   // · Shockwave ripples (beat-triggered)
   updateAndDrawShockwaves(cx, cy);
 
-  // · Orbital rings — BACK arc (behind planet) + save front-arc fn
+  // · Orbital rings — BACK arc (behind planet)
   const drawRingFront = drawOrbitalRings(cx, cy, planetR, hue, bassNorm, t);
 
-  // · Planet core
-  drawPlanet(cx, cy, planetR, hue, bassNorm + idleBr * 0.04, t);
+  // · Ring orbiting particles — BACK half (same z-order as ring back)
+  updateAndDrawRingParticles(cx, cy, planetR, hue, bassNorm, t, rotZ);
 
-  // · Orbital rings — FRONT arc (over planet, creates occlusion)
+  // · Planet core  (bass + treble shimmer routed via bassNorm arg)
+  const trebleBoost = sHigh * 0.18;
+  drawPlanet(cx, cy, planetR, hue, bassNorm + idleBr * 0.04 + trebleBoost, t);
+
+  // · Orbital rings — FRONT arc (over planet, occlusion effect)
   drawRingFront();
 
   // · Outer presence ring — subtle boundary marker
