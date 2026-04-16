@@ -70,7 +70,9 @@ function lerp(start, end, amount) {
 
 // Global state for continuous, smooth motion
 let smoothedIntensity = 0;
+let smoothedBass = 0; // Added for bass-specific reactions
 let time = 0; // Defines continuous time mapping
+let waveRings = []; // To hold the expanding ripples
 
 // The main animation loop
 function draw() {
@@ -80,24 +82,29 @@ function draw() {
   // Get current frequency data from the audio
   analyser.getByteFrequencyData(dataArray);
   
-  // Calculate average volume (overall intensity)
+  // Calculate average volume (overall intensity) and Bass
   let sum = 0;
+  let bassSum = 0;
+  const bassRange = 10; // First 10 bins represent low frequencies
   for (let i = 0; i < dataArray.length; i++) {
     sum += dataArray[i];
+    if (i < bassRange) bassSum += dataArray[i];
   }
   const rawIntensity = (sum / dataArray.length) / 255; 
+  const rawBass = (bassSum / bassRange) / 255; // Extract just the bass
   
-  // 1. Smooth out raw audio data to remove jitter
-  // The '0.1' factor determines how fast the smooth value catches up to the raw value
+  // 1. Smooth out raw audio data for fluid transitions
   smoothedIntensity = lerp(smoothedIntensity, rawIntensity, 0.1); 
+  smoothedBass = lerp(smoothedBass, rawBass, 0.15); // Bass is smoothed slightly faster 
   
-  // Add a very subtle "breathing" effect using sine waves, so it feels alive even when silent
+  // Add a very subtle "breathing" effect using sine waves
   const idleMotion = Math.sin(time) * 0.05 + 0.05; 
   const currentIntensity = smoothedIntensity + idleMotion;
+  const currentBass = smoothedBass + idleMotion;
   
-  // 2. Cosmic Background Fading (Longer Trails)
-  // Using lower alpha (0.1 instead of 0.15) for softer, more atmospheric trailing
-  ctx.fillStyle = 'rgba(0, 0, 8, 0.1)'; 
+  // 2. Cosmic Background Fading (Longer Trails with dynamic color)
+  const bgHue = 220 + (currentBass * 60);
+  ctx.fillStyle = `hsla(${bgHue}, 40%, 5%, 0.15)`; // slightly shift background color based on bass
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   // Find the center of the screen
@@ -108,8 +115,8 @@ function draw() {
   for (let i = 0; i < stars.length; i++) {
     let star = stars[i];
     
-    // Audio Reactive: Stars move faster outward when audio is loud
-    let speed = star.baseSpeed + (smoothedIntensity * star.baseSpeed * 15);
+    // Audio Reactive: Stars move faster outward when Bass drops
+    let speed = star.baseSpeed + (currentBass * star.baseSpeed * 25);
     star.distance += speed;
     
     // Add a very subtle rotation to the entire starfield for an orbital feel
@@ -126,8 +133,8 @@ function draw() {
     let x = centerX + Math.cos(star.angle) * star.distance;
     let y = centerY + Math.sin(star.angle) * star.distance;
     
-    // Audio Reactive: Stars subtly pulse/brighten with sound
-    let brightness = star.alpha + (smoothedIntensity * 0.8);
+    // Audio Reactive: Stars subtly pulse/brighten with bass
+    let brightness = star.alpha + (currentBass * 0.8);
     
     // Stars appear slightly larger as they get further from center (perspective trick)
     let dynamicSize = star.size * (1 + (star.distance / maxDist)); 
@@ -138,41 +145,108 @@ function draw() {
     ctx.fill();
   }
   
-  // 3. Planet / Central Body
+  // 3. Planet / Central Body (Jupiter/Saturn Inspired)
   const planetBase = 80;
-  const planetRadius = planetBase + (currentIntensity * 120); 
-  const hue = 220 + (currentIntensity * 60);
+  // Planet size driven by general intensity, but slightly influenced by bass
+  const planetRadius = planetBase + (currentIntensity * 90) + (currentBass * 40); 
+  
+  // Planet color shifts dynamically over time and intensity
+  const hue = 220 + (currentIntensity * 80) + (Math.sin(time * 0.5) * 30);
 
-  // Create a spherical 3D gradient for a planet look instead of a flat circle
-  const planetGradient = ctx.createRadialGradient(
-    centerX - planetRadius * 0.3, centerY - planetRadius * 0.3, planetRadius * 0.1, // Offset highlight for depth
-    centerX, centerY, planetRadius
-  );
-  
-  planetGradient.addColorStop(0, `hsl(${hue + 40}, 90%, 85%)`); // Bright core
-  planetGradient.addColorStop(0.6, `hsl(${hue}, 80%, 55%)`);    // Mid tone
-  planetGradient.addColorStop(1, `hsl(${hue - 20}, 70%, 15%)`); // Dark shadow edge
-  
+  // Clipping region to draw atmospheric bands neatly on the planet
+  ctx.save();
   ctx.beginPath();
   ctx.arc(centerX, centerY, planetRadius, 0, Math.PI * 2);
+  ctx.clip(); // Ensure bands don't paint outside the planet bounds
+
+  // Create a spherical 3D gradient for the planet base
+  const planetGradient = ctx.createRadialGradient(
+    centerX - planetRadius * 0.3, centerY - planetRadius * 0.3, planetRadius * 0.1,
+    centerX, centerY, planetRadius
+  );
+  planetGradient.addColorStop(0, `hsl(${hue + 30}, 90%, 85%)`); // Bright core
+  planetGradient.addColorStop(0.5, `hsl(${hue}, 70%, 50%)`);    // Mid tone
+  planetGradient.addColorStop(0.8, `hsl(${hue - 30}, 80%, 25%)`); // Deep atmosphere
+  planetGradient.addColorStop(1, `hsl(${hue - 40}, 90%, 5%)`);  // Dark shadow edge
+  
   ctx.fillStyle = planetGradient;
-  
-  // Soft atmospheric planet glow
-  ctx.shadowBlur = 50 + (currentIntensity * 60);
-  ctx.shadowColor = `hsl(${hue}, 100%, 65%)`;
   ctx.fill();
-  
-  // 4. Energy Field / Wave Ring
-  // A bright outer ring that represents the audio wave radiating outwards
+
+  // Draw gaseous Jupiter-like bands across the planet
+  for(let b = 0; b < 5; b++) {
+     ctx.beginPath();
+     // Draw thick, soft ellipses over the surface
+     const bandY = centerY - planetRadius + (b * (planetRadius * 0.5));
+     // The thickness of the bands pulses dynamically with the bass
+     const bandHeight = planetRadius * 0.2 + (currentBass * 20);
+     ctx.ellipse(centerX, bandY, planetRadius, bandHeight, 0, 0, Math.PI * 2);
+     ctx.fillStyle = `hsla(${hue + (b * 15)}, 60%, 50%, 0.15)`;
+     ctx.fill();
+  }
+  ctx.restore(); // Remove clipping mask
+
+  // Soft atmospheric planet glow (rendered outside so it isn't clipped)
   ctx.beginPath();
-  const waveRadius = planetRadius + 30 + (smoothedIntensity * 150); // Reacts more strongly to sound spikes
-  ctx.arc(centerX, centerY, waveRadius, 0, Math.PI * 2);
-  
-  ctx.strokeStyle = `hsla(${hue + 20}, 90%, 75%, ${0.15 + smoothedIntensity * 0.5})`; // Spikes in opacity
-  ctx.lineWidth = 1.5 + (smoothedIntensity * 6); // Stroke gets thicker with volume
-  ctx.shadowBlur = 30; 
-  ctx.stroke();
-  
-  // Reset shadow for the next frame
+  ctx.arc(centerX, centerY, planetRadius, 0, Math.PI * 2);
+  ctx.shadowBlur = 60 + (currentIntensity * 80);
+  ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+  ctx.fillStyle = 'rgba(0,0,0,0)'; // transparent fill just to trigger the outer shadow
+  ctx.fill();
   ctx.shadowBlur = 0;
+  
+  // 4. Energy Fields / Radial Expanding Waves
+  // Spawn new expanding waves spontaneously, mapped to bass spikes
+  if (Math.random() < currentBass * 0.3 + 0.02) {
+      waveRings.push({ 
+          radius: planetRadius, 
+          alpha: 0.8, 
+          hueOffset: Math.random() * 60 - 30, // Dynamic color variation per wave
+          speed: 1 + (currentBass * 4) // wave expanding speed tied to current bass
+      });
+  }
+
+  // Draw and update all active expanding waves
+  for (let i = waveRings.length - 1; i >= 0; i--) {
+      let wave = waveRings[i];
+      
+      // Expand outward smoothly
+      wave.radius += wave.speed + (currentIntensity * 3);
+      // Fade out slowly
+      wave.alpha -= 0.005 + (currentIntensity * 0.002);
+      
+      if (wave.alpha <= 0) {
+          waveRings.splice(i, 1); // remove dead waves
+      } else {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, wave.radius, 0, Math.PI * 2);
+          
+          // dynamic multi-tonal shifting as it expands
+          const waveHue = hue + wave.hueOffset + (wave.radius * 0.1);
+          
+          ctx.strokeStyle = `hsla(${waveHue}, 90%, 65%, ${wave.alpha})`;
+          ctx.lineWidth = 1 + (wave.alpha * 3) + (currentBass * 4);
+          
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = `hsl(${waveHue}, 100%, 70%)`;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+      }
+  }
+  
+  // 5. Aesthetic Equatorial Energy Ring (Saturn ring aspect)
+  ctx.beginPath();
+  const ringRadiusX = planetRadius * 2.2 + (currentIntensity * 80);
+  const ringRadiusY = planetRadius * 0.4 + (currentIntensity * 20);
+  // Tilt the ring by an angle, representing an orbital field
+  ctx.ellipse(centerX, centerY, ringRadiusX, ringRadiusY, 0.35, 0, Math.PI * 2);
+  
+  // Linear gradient gives the ring depth and fading edges
+  const ringGrad = ctx.createLinearGradient(centerX - ringRadiusX, centerY - ringRadiusY, centerX + ringRadiusX, centerY + ringRadiusY);
+  ringGrad.addColorStop(0, `hsla(${hue + 40}, 80%, 70%, 0.1)`);
+  ringGrad.addColorStop(0.5, `hsla(${hue - 10}, 90%, 80%, ${0.3 + currentBass * 0.4})`);
+  ringGrad.addColorStop(1, `hsla(${hue + 20}, 70%, 60%, 0.0)`);
+  
+  ctx.strokeStyle = ringGrad;
+  ctx.lineWidth = 4 + (currentBass * 10);
+  ctx.stroke();
 }
