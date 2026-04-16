@@ -30,12 +30,73 @@ resize();
 const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('start-btn');
 
+// --- Start Screen Starfield ---
+const startCanvas = document.getElementById('start-canvas');
+let startCtx = null;
+let startAnimationId = null;
+
+if (startCanvas) {
+  startCtx = startCanvas.getContext('2d');
+  let startStars = [];
+  const NUM_START_STARS = 150;
+
+  function initStartStars() {
+    startStars = [];
+    for (let i = 0; i < NUM_START_STARS; i++) {
+      startStars.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        radius: Math.random() * 1.2 + 0.3,
+        speed: Math.random() * 0.05 + 0.01,
+        alpha: Math.random() * 0.5 + 0.1
+      });
+    }
+  }
+
+  function resizeStartCanvas() {
+    startCanvas.width = window.innerWidth;
+    startCanvas.height = window.innerHeight;
+    initStartStars();
+  }
+
+  window.addEventListener('resize', resizeStartCanvas);
+  resizeStartCanvas();
+
+  function drawStartStars() {
+    startCtx.clearRect(0, 0, startCanvas.width, startCanvas.height);
+    
+    startStars.forEach(star => {
+      // Drift upwards/diagonally very slowly
+      star.y -= star.speed;
+      star.x -= star.speed * 0.3;
+      
+      if (star.y < 0) star.y = startCanvas.height;
+      if (star.x < 0) star.x = startCanvas.width;
+      
+      startCtx.beginPath();
+      startCtx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+      startCtx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+      startCtx.fill();
+    });
+    
+    startAnimationId = requestAnimationFrame(drawStartStars);
+  }
+  
+  drawStartStars();
+}
+// ------------------------------
+
 let audioCtx, analyser, dataArray;
 
 // Start everything when the user clicks the button
 startBtn.addEventListener('click', async () => {
   // Hide the initial overlay smoothly
   overlay.classList.add('hidden');
+  
+  // Stop start screen animation to save resources
+  if (startAnimationId) {
+    cancelAnimationFrame(startAnimationId);
+  }
   
   try {
     // 1. Request microphone access
