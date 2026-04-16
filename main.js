@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 //  NOVA – Noise Oriented Visual Aesthetics
-//  Step 5: Star field · Ring particles · Treble shimmer
+//  Step 6: Orbiting moon · Beat bloom
 //  · Saturn-like planet core with layered atmospheric glow
 //  · Orbital rings split into back/front arcs (planet occludes center)
 //  · Nebula cloud layer: slow, large drifting soft blobs
@@ -259,9 +259,72 @@ async function startAudio() {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  MOON  — small glowing body on a slow inclined circular orbit
+//  Orbit radius is a fixed multiple of the planet radius so it
+//  scales naturally with the planet.  Bass gently expands the
+//  moon’s own halo so it “pulses” in sync with the beat.
+// ─────────────────────────────────────────────────────────────
+const MOON = {
+  orbitSpeed : 0.07,    // radians per second (slow, majestic)
+  orbitTilt  : 0.42,    // inclination of orbit plane (radians)
+  orbitScale : 3.6,     // orbit radius = planetR * orbitScale
+  moonScale  : 0.22,    // moon radius = planetR * moonScale
+};
+
+function drawMoon(cx, cy, planetR, hue, bassNorm, t) {
+  const angle  = t * MOON.orbitSpeed;
+  const oR     = planetR * MOON.orbitScale;
+  const mR     = planetR * MOON.moonScale;
+
+  // 3-D inclined orbit: rotate orbit plane around X-axis by tilt
+  // x stays in screen-plane, y is foreshortened, z gives depth cue.
+  const rawX = Math.cos(angle) * oR;
+  const rawY = Math.sin(angle) * oR;
+  const mx   = cx + rawX;
+  const my   = cy + rawY * Math.cos(MOON.orbitTilt);
+  const mz   = rawY * Math.sin(MOON.orbitTilt);  // positive = toward viewer
+
+  // Depth cue: moon appears slightly smaller when behind, larger in front
+  const depthScale = 1 + mz / (oR * 2.5) * 0.15;
+  const mr = mR * depthScale;
+
+  // Alpha reduced when z < 0 (behind planet)
+  const depthAlpha = mz < -planetR * 0.4 ? 0.35 : 1.0;
+
+  // Halo (atmospheric glow)
+  const haloR = mr * (2.8 + bassNorm * 0.9);
+  const mHue  = (hue + 170) % 360;
+  const haloGrd = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, haloR);
+  haloGrd.addColorStop(0,   `hsla(${mHue}, 80%, 75%, ${0.22 * depthAlpha})`);
+  haloGrd.addColorStop(0.5, `hsla(${mHue}, 70%, 55%, ${0.08 * depthAlpha})`);
+  haloGrd.addColorStop(1,   `hsla(${mHue}, 60%, 40%, 0)`);
+  ctx.beginPath();
+  ctx.arc(mx, my, haloR, 0, Math.PI * 2);
+  ctx.fillStyle = haloGrd;
+  ctx.fill();
+
+  // Surface (small radial gradient sphere)
+  const mSurface = ctx.createRadialGradient(
+    mx - mr * 0.28, my - mr * 0.28, mr * 0.05,
+    mx, my, mr
+  );
+  mSurface.addColorStop(0,    `hsla(${mHue + 30}, 90%, 92%, ${depthAlpha})`);
+  mSurface.addColorStop(0.45, `hsla(${mHue + 10}, 75%, 65%, ${depthAlpha})`);
+  mSurface.addColorStop(1,    `hsla(${mHue - 10}, 60%, 30%, ${depthAlpha * 0.9})`);
+  ctx.beginPath();
+  ctx.arc(mx, my, mr, 0, Math.PI * 2);
+  ctx.fillStyle   = mSurface;
+  ctx.shadowColor = `hsla(${mHue}, 100%, 80%, ${0.4 * depthAlpha})`;
+  ctx.shadowBlur  = 14;
+  ctx.fill();
+  ctx.shadowBlur  = 0;
+}
+
+// ─────────────────────────────────────────────────────────────
 //  SMOOTHED AUDIO STATE  (persists across frames)
 // ─────────────────────────────────────────────────────────────
 let prevBassNorm = 0;
+let bloomAlpha   = 0;   // beat bloom: full-screen flash that decays each frame
 let sBass    = 0;
 let sMid     = 0;
 let sHigh    = 0;
@@ -628,7 +691,10 @@ function draw(analyser, freqData, waveData) {
   const hue = (Date.now() * 0.008 + midNorm * 40 + 220) % 360;
 
   // ── Beat detection (raw → still snappy) ───────────────────
-  if (rawBass > 0.55 && prevBassNorm < 0.45) spawnShockwave(hue);
+  if (rawBass > 0.55 && prevBassNorm < 0.45) {
+    spawnShockwave(hue);
+    bloomAlpha = 0.12 + rawBass * 0.10;  // stronger hit → brighter flash
+  }
   prevBassNorm = rawBass;
 
   // ── Planet radius — smoothly interpolated ──────────────────
@@ -694,6 +760,9 @@ function draw(analyser, freqData, waveData) {
   // · Orbital rings — FRONT arc (over planet, occlusion effect)
   drawRingFront();
 
+  // · Moon (orbits proudly above everything except bloom)
+  drawMoon(cx, cy, planetR, hue, bassNorm, t);
+
   // · Outer presence ring — subtle boundary marker
   const outerR    = innerR + Math.min(W, H) * 0.32;
   const ringAlpha = map(overallNorm + idleBr * 0.03, 0, 1, 0.02, 0.14);
@@ -703,4 +772,15 @@ function draw(analyser, freqData, waveData) {
   ctx.lineWidth   = 1;
   ctx.shadowBlur  = 0;
   ctx.stroke();
+
+  // · Beat bloom — full-screen radial flash, decays ~18 frames
+  if (bloomAlpha > 0.002) {
+    const bloomGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+    bloomGrd.addColorStop(0,   `hsla(${hue}, 80%, 90%, ${bloomAlpha})`);
+    bloomGrd.addColorStop(0.4, `hsla(${hue}, 70%, 70%, ${bloomAlpha * 0.3})`);
+    bloomGrd.addColorStop(1,   `hsla(${hue}, 60%, 50%, 0)`);
+    ctx.fillStyle = bloomGrd;
+    ctx.fillRect(0, 0, W, H);
+    bloomAlpha *= 0.80;  // exponential decay — gone in ~18 frames
+  }
 }
