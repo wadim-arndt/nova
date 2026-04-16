@@ -46,9 +46,10 @@ if (startCanvas) {
       startStars.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * window.innerHeight,
-        radius: Math.random() * 1.2 + 0.3,
-        speed: Math.random() * 0.05 + 0.01,
-        alpha: Math.random() * 0.5 + 0.1
+        radius: Math.random() * 1.4 + 0.4, // Slightly larger stars
+        speed: Math.random() * 0.03 + 0.01, // Slower motion
+        alpha: Math.random() * 0.5 + 0.2,   // More visible alpha
+        offset: Math.random() * Math.PI * 2 
       });
     }
   }
@@ -62,21 +63,37 @@ if (startCanvas) {
   window.addEventListener('resize', resizeStartCanvas);
   resizeStartCanvas();
 
+  let startStarsTime = 0;
   function drawStartStars() {
+    startStarsTime += 0.005; // Extremely slow time progression for pulsing
     startCtx.clearRect(0, 0, startCanvas.width, startCanvas.height);
     
     startStars.forEach(star => {
-      // Drift upwards/diagonally very slowly
-      star.y -= star.speed;
-      star.x -= star.speed * 0.3;
+      // Extremely slow drift
+      star.y -= star.speed * 0.5;
+      star.x -= star.speed * 0.15;
       
       if (star.y < 0) star.y = startCanvas.height;
       if (star.x < 0) star.x = startCanvas.width;
+
+      // Soft pulsing (size and brightness)
+      const pulse = Math.sin(startStarsTime + star.offset) * 0.5 + 0.5;
+      const currentAlpha = star.alpha * (0.7 + pulse * 0.3);
+      const currentRadius = star.radius * (0.9 + pulse * 0.2);
       
       startCtx.beginPath();
-      startCtx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-      startCtx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+      startCtx.arc(star.x, star.y, currentRadius, 0, Math.PI * 2);
+      // Brighter, more contrasty white
+      startCtx.fillStyle = `rgba(255, 255, 255, ${currentAlpha})`;
       startCtx.fill();
+      
+      // Optional: Add a very faint glow to the brightest stars
+      if (currentAlpha > 0.5) {
+        startCtx.shadowBlur = 4;
+        startCtx.shadowColor = 'rgba(255, 255, 255, 0.4)';
+        startCtx.stroke(); // Faint stroke to add presence
+        startCtx.shadowBlur = 0;
+      }
     });
     
     startAnimationId = requestAnimationFrame(drawStartStars);
